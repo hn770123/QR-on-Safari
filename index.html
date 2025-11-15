@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QRコードジェネレーター</title>
+    <style>
+        /* 全体のスタイル設定 */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        /* メインコンテナのスタイル */
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        /* タイトルのスタイル */
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        /* テキストエリアのラベルスタイル */
+        label {
+            display: block;
+            margin-bottom: 10px;
+            color: #555;
+            font-weight: bold;
+        }
+
+        /* テキストエリアのスタイル */
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            resize: vertical;
+            box-sizing: border-box;
+            margin-bottom: 20px;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+
+        /* ボタンのスタイル */
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 20px;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        /* ログエリアのスタイル */
+        .log-area {
+            background-color: #f9f9f9;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+            min-height: 150px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        /* ログメッセージのスタイル */
+        .log-message {
+            margin: 5px 0;
+            padding: 5px;
+            animation: fadeIn 0.5s;
+        }
+
+        /* ログメッセージのフェードインアニメーション */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* ログメッセージの種類別スタイル */
+        .log-info {
+            color: #2196F3;
+        }
+
+        .log-success {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+
+        .log-error {
+            color: #f44336;
+            font-weight: bold;
+        }
+
+        /* QRコード表示エリアのスタイル */
+        .qr-area {
+            text-align: center;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            min-height: 100px;
+        }
+
+        /* QRコードの画像スタイル */
+        #qrcode {
+            display: inline-block;
+            margin-top: 10px;
+        }
+
+        /* 非表示クラス */
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 QRコードジェネレーター</h1>
+
+        <!-- テキスト入力エリア -->
+        <div>
+            <label for="textInput">QRコードにする文字列を入力してください：</label>
+            <textarea id="textInput" rows="4" placeholder="例：https://example.com または 任意のテキスト"></textarea>
+        </div>
+
+        <!-- QRコード生成ボタン -->
+        <button id="generateBtn">QRコードを生成</button>
+
+        <!-- ログ表示エリア -->
+        <div>
+            <label>実行ログ：</label>
+            <div id="logArea" class="log-area"></div>
+        </div>
+
+        <!-- QRコード表示エリア -->
+        <div>
+            <label>生成されたQRコード：</label>
+            <div class="qr-area">
+                <div id="qrcode"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- QRコード生成ライブラリ（ローカル） -->
+    <script src="qrcode.min.js"></script>
+
+    <script>
+        /**
+         * QRコード生成アプリケーション
+         * ユーザーが入力したテキストからQRコードを生成し、
+         * 処理の各ステップをログとして表示する
+         */
+
+        // DOM要素の取得
+        const textInput = document.getElementById('textInput');
+        const generateBtn = document.getElementById('generateBtn');
+        const logArea = document.getElementById('logArea');
+        const qrcodeDiv = document.getElementById('qrcode');
+
+        /**
+         * ログメッセージを追加する関数
+         * @param {string} message - ログに表示するメッセージ
+         * @param {string} type - ログの種類（info, success, error）
+         */
+        function addLog(message, type = 'info') {
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-message log-${type}`;
+            const timestamp = new Date().toLocaleTimeString('ja-JP');
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            logArea.appendChild(logEntry);
+            // ログエリアを自動スクロール
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+
+        /**
+         * 遅延処理を行う関数（ログ表示のタイミング調整用）
+         * @param {number} ms - 待機時間（ミリ秒）
+         * @returns {Promise} 指定時間後に解決されるPromise
+         */
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        /**
+         * QRコード生成の実行関数
+         * 各ステップごとにログを出力し、最後にQRコードを表示する
+         */
+        async function generateQRCode() {
+            try {
+                // ボタンを無効化
+                generateBtn.disabled = true;
+                
+                // ログエリアをクリア
+                logArea.innerHTML = '';
+                
+                // QRコード表示エリアをクリア
+                qrcodeDiv.innerHTML = '';
+
+                // ステップ1: 処理開始
+                addLog('QRコード生成処理を開始します...', 'info');
+                await delay(500);
+
+                // ステップ2: 入力値の取得
+                addLog('入力値を取得中...', 'info');
+                await delay(500);
+                const inputText = textInput.value.trim();
+                
+                // ステップ3: 入力値の検証
+                addLog('入力値を検証中...', 'info');
+                await delay(500);
+                
+                if (!inputText) {
+                    addLog('エラー: 文字列が入力されていません', 'error');
+                    generateBtn.disabled = false;
+                    return;
+                }
+                
+                addLog(`入力値: "${inputText}" (${inputText.length}文字)`, 'success');
+                await delay(500);
+
+                // ステップ4: QRコード生成の準備
+                addLog('QRコード生成ライブラリを初期化中...', 'info');
+                await delay(500);
+
+                // ステップ5: QRコード生成実行
+                addLog('QRコードを生成中...', 'info');
+                await delay(800);
+
+                // QRコード生成
+                new QRCode(qrcodeDiv, {
+                    text: inputText,
+                    width: 256,
+                    height: 256,
+                    colorDark: '#000000',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.H
+                });
+
+                // ステップ6: 完了
+                await delay(300);
+                addLog('QRコードの生成が完了しました！', 'success');
+                addLog('画面下部にQRコードが表示されています', 'success');
+
+            } catch (error) {
+                // エラー処理
+                addLog(`エラーが発生しました: ${error.message}`, 'error');
+                console.error('QRコード生成エラー:', error);
+            } finally {
+                // ボタンを再度有効化
+                generateBtn.disabled = false;
+            }
+        }
+
+        /**
+         * ボタンクリックイベントリスナー
+         * QRコード生成処理を実行する
+         */
+        generateBtn.addEventListener('click', generateQRCode);
+
+        /**
+         * Enterキーでも生成できるようにする
+         * テキストエリア内でCtrl+Enterを押すとQRコード生成
+         */
+        textInput.addEventListener('keydown', (event) => {
+            if (event.ctrlKey && event.key === 'Enter') {
+                generateQRCode();
+            }
+        });
+
+        // 初期ログメッセージ
+        addLog('QRコードジェネレーターが起動しました', 'info');
+        addLog('文字列を入力してボタンをクリックしてください', 'info');
+    </script>
+</body>
+</html>
